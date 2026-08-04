@@ -12,11 +12,8 @@ namespace NOVR.VrCamera;
 [HarmonyPatch(typeof(XRPass), nameof(XRPass.GetProjMatrix))]
 internal static class XRPassZoomPatch
 {
-    private static float _nextTelemetryTime;
-    private static bool _loggedHook;
-
     [HarmonyPostfix]
-    private static void Postfix(int viewIndex, ref Matrix4x4 __result)
+    private static void Postfix(ref Matrix4x4 __result)
     {
         var magnification = VrZoomController.Magnification;
         if (magnification <= 1f)
@@ -24,18 +21,8 @@ internal static class XRPassZoomPatch
             return;
         }
 
-        var nativeM00 = __result.m00;
-        var nativeM11 = __result.m11;
-        __result = VrZoomController.MagnifyProjection(__result);
-
-        if (!_loggedHook || Time.unscaledTime >= _nextTelemetryTime)
-        {
-            Debug.Log(
-                $"[NOVR.Zoom.XRPass] view={viewIndex}, magnification={magnification:0.###}, " +
-                $"projection=({nativeM00:0.###},{nativeM11:0.###})" +
-                $"->({__result.m00:0.###},{__result.m11:0.###}).");
-            _loggedHook = true;
-            _nextTelemetryTime = Time.unscaledTime + 0.5f;
-        }
+        // Preserve the asymmetric optical centre (m02/m12) supplied by OpenXR.
+        __result.m00 *= magnification;
+        __result.m11 *= magnification;
     }
 }
